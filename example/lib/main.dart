@@ -13,9 +13,7 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-      home: Scaffold(
-        body: Sheet(),
-      ),
+      home: Sheet(),
     );
   }
 }
@@ -29,11 +27,11 @@ class Sheet extends StatefulWidget {
 
 class _SheetState extends State<Sheet> {
   late final AsyncSheetSource<Person> _source;
-  
+
   @override
   void initState() {
     super.initState();
-    _source = PersonAsyncSheetSource(initialData: initialData);
+    _source = PersonAsyncSheetSource();
   }
 
   @override
@@ -44,11 +42,35 @@ class _SheetState extends State<Sheet> {
 
   @override
   Widget build(BuildContext context) {
-    return AsyncPaginatedSheet<Person>(
-      source: _source,
-      columns: _columns,
-      rowSpanBuilder: _rowBuilder,
-      columnSpanBuilder: _columnBuilder,
+    return Scaffold(
+      body: AsyncPaginatedSheet<Person>(
+        source: _source,
+        columns: _columns,
+        rowSpanBuilder: _rowBuilder,
+        columnSpanBuilder: _columnBuilder,
+      ),
+      persistentFooterButtons: [
+        TextButton(
+          onPressed: () async {
+            await _source.fetchPreviousPage();
+          },
+          child: const Text('Previous'),
+        ),
+        const VerticalDivider(width: 2.0),
+        ValueListenableBuilder(
+          valueListenable: _source.pageIndex,
+          builder: (context, index, _) {
+            return Text('Page $index');
+          },
+        ),
+        const VerticalDivider(width: 2.0),
+        TextButton(
+          onPressed: () async {
+            await _source.fetchNextPage();
+          },
+          child: const Text('Next'),
+        ),
+      ],
     );
   }
 
@@ -59,15 +81,21 @@ class _SheetState extends State<Sheet> {
         ),
         SheetColumn<Person>(
           label: const Text('First Name'),
-          builder: (vicinity, item, state) => Text(item!.firstName),
+          builder: (vicinity, item, state) => state != SourceState.loading
+              ? Text(item?.firstName ?? '')
+              : const CircularProgressIndicator(),
         ),
         SheetColumn<Person>(
           label: const Text('Last Name'),
-          builder: (vicinity, item, state) => Text(item!.lastName),
+          builder: (vicinity, item, state) => state != SourceState.loading
+              ? Text(item?.lastName ?? '')
+              : const CircularProgressIndicator(),
         ),
         SheetColumn<Person>(
           label: const Text('Age'),
-          builder: (vicinity, item, state) => Text(item!.age.toString()),
+          builder: (vicinity, item, state) => state != SourceState.loading
+              ? Text(item?.age.toString() ?? '')
+              : const CircularProgressIndicator(),
         ),
       ];
 

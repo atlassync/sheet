@@ -1,18 +1,14 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
-import 'package:sheet/src/column.dart';
-import 'package:sheet/src/controller.dart';
-import 'package:sheet/src/row.dart';
+import 'package:flutter/widgets.dart';
+import 'package:sheet/sheet.dart';
 
-class Sheet<T> extends StatefulWidget {
-  const Sheet({
+typedef SheetSpanBuilder = SheetSpan Function(int index, SourceState state);
+
+class AsyncPaginatedSheet<T> extends StatefulWidget {
+  const AsyncPaginatedSheet({
     super.key,
-    required this.source,
-    required this.columns,
-    required this.rows,
-    required this.columnSpan,
-    required this.rowSpan,
     this.primary,
     this.mainAxis = Axis.vertical,
     this.horizontalDetails = const ScrollableDetails.horizontal(),
@@ -23,15 +19,13 @@ class Sheet<T> extends StatefulWidget {
     this.keyboardDismissBehavior = ScrollViewKeyboardDismissBehavior.manual,
     this.clipBehavior = Clip.hardEdge,
     this.pinnedColumnCount = 0,
-    this.pinnedRowCount = 0,
-    this.pinnedExtent = const FixedSpanExtent(48.0),
+    this.pinnedRowCount = 1,
+    required this.source,
+    required this.columns,
+    this.columnSpanBuilder,
+    this.rowSpanBuilder,
   });
 
-  final SheetDataSource<T> source;
-  final List<SheetColumn> columns;
-  final List<SheetRow<T>> rows;
-  final TableSpanBuilder columnSpan;
-  final TableSpanBuilder rowSpan;
   final bool? primary;
   final Axis mainAxis;
   final ScrollableDetails horizontalDetails;
@@ -43,99 +37,93 @@ class Sheet<T> extends StatefulWidget {
   final Clip clipBehavior;
   final int pinnedRowCount;
   final int pinnedColumnCount;
-  final SpanExtent pinnedExtent;
+  final AsyncSheetSource<T> source;
+  final List<SheetColumn<T>> columns;
+  final SheetSpanBuilder? columnSpanBuilder;
+  final SheetSpanBuilder? rowSpanBuilder;
 
   @override
-  State<Sheet<T>> createState() => _SheetState<T>();
+  State<AsyncPaginatedSheet<T>> createState() => _AsyncPaginatedSheetState<T>();
 }
 
-class _SheetState<T> extends State<Sheet<T>> {
-  late int _rowCount;
-  late int _columnCount;
+class _AsyncPaginatedSheetState<T> extends State<AsyncPaginatedSheet<T>> {
+  late SourceState _state;
   @override
   void initState() {
     super.initState();
-    for (var element in widget.rows) {
-      if (widget.columns.length != element.builder(context, 0, null).length) {
-        throw Exception(
-            'Each row must contain exactly as many cells as there are columns.');
-      }
-    }
-    _rowCount = widget.source.items.value.length + 1;
-    _columnCount = widget.columns.length;
-
-    widget.source.items.addListener(_handleItemsChanged);
+    _state = SourceState.idle;
+    widget.source.state.addListener(_onSourceStateChanged);
   }
 
   @override
   void dispose() {
-    widget.source.items.removeListener(_handleItemsChanged);
+    widget.source.state.removeListener(_onSourceStateChanged);
     super.dispose();
   }
 
-  void _handleItemsChanged() {
+  void _onSourceStateChanged() {
     setState(() {
-      _rowCount = widget.source.items.value.length + 1;
+      _state = widget.source.state.value;
     });
   }
 
+  int? get _columnCount =>
+      widget.columns.isEmpty ? null : widget.columns.length;
+
+  int? get _rowCount => _state == SourceState.loading
+      ? null
+      : widget.source.activePage.value.length + 1;
+
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: widget.source.isFetching,
-      builder: (context, isFetching, child) {
-        return TableView.builder(
-          primary: widget.primary,
-          mainAxis: widget.mainAxis,
-          horizontalDetails: widget.horizontalDetails,
-          verticalDetails: widget.verticalDetails,
-          cacheExtent: widget.cacheExtent,
-          diagonalDragBehavior: widget.diagonalDragBehavior,
-          dragStartBehavior: widget.dragStartBehavior,
-          keyboardDismissBehavior: widget.keyboardDismissBehavior,
-          clipBehavior: widget.clipBehavior,
-          pinnedColumnCount: widget.pinnedColumnCount,
-          pinnedRowCount: widget.pinnedRowCount,
-          columnBuilder: widget.columnSpan,
-          rowBuilder: widget.rowSpan,
-          rowCount: isFetching ? null : _rowCount,
-          columnCount: _columnCount,
-          cellBuilder: (_, vicinity) => TableViewCell(
-            child: isFetching
-                ? _buildLoadingCells(vicinity)
-                : _buildCell(
-                    vicinity,
-                  ),
-          ),
-        );
-      },
+    return TableView.builder(
+      primary: widget.primary,
+      mainAxis: widget.mainAxis,
+      horizontalDetails: widget.horizontalDetails,
+      verticalDetails: widget.verticalDetails,
+      cacheExtent: widget.cacheExtent,
+      diagonalDragBehavior: widget.diagonalDragBehavior,
+      dragStartBehavior: widget.dragStartBehavior,
+      keyboardDismissBehavior: widget.keyboardDismissBehavior,
+      clipBehavior: widget.clipBehavior,
+      pinnedColumnCount: widget.pinnedColumnCount,
+      pinnedRowCount: widget.pinnedRowCount,
+      columnCount: _columnCount,
+      rowCount: _rowCount,
+      columnBuilder: _buildColumnSpan,
+      rowBuilder: _buildRowSpan,
+      cellBuilder: (_, vicinity) => TableViewCell(
+        child: _buildCell(
+          vicinity,
+        ),
+      ),
     );
   }
 
   Widget _buildCell(ChildVicinity vicinity) {
     if (vicinity.yIndex == 0) {
-      return widget.columns.elementAt(vicinity.xIndex).builder(context);
+      return widget.columns.elementAtOrNull(vicinity.xIndex)?.label ??
+          const SizedBox.shrink();
     }
-    if (vicinity.yIndex == _rowCount) {
-      return const SizedBox.shrink();
-    }
+
     final itemIndex = vicinity.yIndex - 1;
-    final item = widget.source.items.value[itemIndex];
-    final cellWidgets =
-        widget.rows[itemIndex].builder(context, vicinity.yIndex, item);
-    return cellWidgets[vicinity.xIndex].builder(context);
+    final item = widget.source.activePage.value.elementAtOrNull(itemIndex);
+    final cell = widget.columns.elementAtOrNull(vicinity.xIndex);
+    return cell?.builder(vicinity, item, widget.source.state.value) ??
+        const SizedBox.shrink();
   }
 
-  Widget _buildLoadingCells(ChildVicinity vicinity) {
-    if (vicinity.yIndex == 0) {
-      return widget.columns.elementAt(vicinity.xIndex).builder(context);
-    }
+  Span _buildRowSpan(int index) {
+    return widget.rowSpanBuilder
+            ?.call(index, widget.source.state.value)
+            .toSpan() ??
+        const SheetSpan().toSpan();
+  }
 
-    return widget.rows.isEmpty
-        ? const CircularProgressIndicator()
-        : widget.rows.first
-            .builder(context, vicinity.yIndex, null)
-            .elementAt(vicinity.xIndex)
-            .builder(context);
+  Span _buildColumnSpan(int index) {
+    return widget.columnSpanBuilder
+            ?.call(index, widget.source.state.value)
+            .toSpan() ??
+        const SheetSpan().toSpan();
   }
 }

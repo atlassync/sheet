@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:sheet/sheet.dart';
 
-typedef SheetColumnBuilder = Widget Function(BuildContext context);
-
-class SheetColumn {
+class SheetColumn<T> {
   SheetColumn({
+    required this.label,
     required this.builder,
   });
 
-  final SheetColumnBuilder builder;
-
-  static SheetColumn empty =
-      SheetColumn(builder: (_) => const SizedBox.shrink());
+  final Widget label;
+  final Widget Function(ChildVicinity vicinity, T? item, SourceState state) builder;
 }

@@ -46,10 +46,18 @@ class _SheetState extends State<Sheet> {
       body: AsyncPaginatedSheet<Person>(
         source: _source,
         columns: _columns,
-        rowSpanBuilder: _rowBuilder,
-        columnSpanBuilder: _columnBuilder,
+        rowSpanBuilder: _defaultSpanBuilder,
+        columnSpanBuilder: _defaultSpanBuilder,
+        defaultRowSpan: _defaultSpan,
+        defaultColumnSpan: _defaultSpan,
       ),
       persistentFooterButtons: [
+        TextButton(
+          onPressed: () async {
+            await _source.refreshPage();
+          },
+          child: const Text('Refresh'),
+        ),
         TextButton(
           onPressed: () async {
             await _source.fetchPreviousPage();
@@ -99,35 +107,24 @@ class _SheetState extends State<Sheet> {
         ),
       ];
 
-  SheetSpan _rowBuilder(int index, SourceState _) {
-    return SheetSpan(
-      extent: index == 0
-          ? const FixedSpanExtent(48.0)
-          : const FixedSpanExtent(96.0),
-      foregroundDecoration: const SpanDecoration(
-        border: SpanBorder(
-          trailing: BorderSide(
-            color: Colors.grey,
-          ),
-        ),
-      ),
-      onTap: () => debugPrint('$index'),
-      onDoubleTap: () => debugPrint('double-tap'),
-    );
+  SheetSpan? _defaultSpanBuilder(int index, SourceState _) {
+    return index == 0
+        ? _defaultSpan.copyWith(
+            extent: const FixedSpanExtent(
+              48.0,
+            ),
+          )
+        : null;
   }
 
-  SheetSpan _columnBuilder(int index, SourceState _) {
-    return SheetSpan(
-      extent: index == 0
-          ? const FixedSpanExtent(48.0)
-          : const FixedSpanExtent(96.0),
-      foregroundDecoration: const SpanDecoration(
-        border: SpanBorder(
-          trailing: BorderSide(
-            color: Colors.grey,
+  SheetSpan get _defaultSpan => const SheetSpan(
+        extent: FixedSpanExtent(96.0),
+        foregroundDecoration: SpanDecoration(
+          border: SpanBorder(
+            trailing: BorderSide(
+              color: Colors.grey,
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
 }

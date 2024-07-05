@@ -9,7 +9,7 @@ class PersonAsyncSheetSource extends AsyncSheetSource<Person> {
           pageSize: 2
         );
 
-  static Future<List<Person>> fetchData(int index) async {
+  static Future<List<Person>> fetchData(int index, int size) async {
     // Simulate network delay
     await Future.delayed(const Duration(seconds: 2));
 

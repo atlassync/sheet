@@ -26,7 +26,8 @@ class AsyncSheetSource<T> {
         var end = (i + pageSize > initialData.length)
             ? initialData.length
             : i + pageSize;
-        _pages.putIfAbsent((i ~/ pageSize) + 1, () => initialData.sublist(i, end));
+        _pages.putIfAbsent(
+            (i ~/ pageSize) + 1, () => initialData.sublist(i, end));
       }
 
       _activePage.value = _pages.isNotEmpty ? _pages[1]! : [];
@@ -35,9 +36,9 @@ class AsyncSheetSource<T> {
     fetchNextPage();
   }
 
-  FutureOr<void> _loadPage(int index) async {
+  FutureOr<void> _loadPage(int index, {bool forceFetch = false}) async {
     _state.value = SourceState.loading;
-    if (_pages[index] != null) {
+    if (!forceFetch && _pages[index] != null) {
       _state.value = SourceState.success;
       return;
     }
@@ -45,7 +46,7 @@ class AsyncSheetSource<T> {
     try {
       List<T> newData = await fetcher(index, pageSize);
 
-      _pages.putIfAbsent(index, () => newData);
+      _pages.update(index,(_) => newData, ifAbsent: () => newData);
       _state.value = SourceState.success;
     } catch (e) {
       debugPrint('Error loading page $index: $e');
@@ -58,6 +59,13 @@ class AsyncSheetSource<T> {
 
     await _loadPage(nextPageIndex);
     _switchPage(nextPageIndex);
+  }
+
+  FutureOr<void> refreshPage({int? index}) async {
+    if (index != null && (index < 1 || index > _activePageIndex)) return;
+    int pageIndexToRefresh = index ?? _activePageIndex;
+    await _loadPage(pageIndexToRefresh, forceFetch: true);
+    _switchPage(pageIndexToRefresh);
   }
 
   FutureOr<void> fetchPreviousPage() async {

@@ -1,10 +1,9 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:sheet/sheet.dart';
 
-typedef SheetSpanBuilder = SheetSpan Function(int index, SourceState state);
+typedef SheetSpanBuilder = SheetSpan? Function(int index, SourceState state);
+final _defaultSpan = const SheetSpan().toSpan();
 
 class AsyncPaginatedSheet<T> extends StatefulWidget {
   const AsyncPaginatedSheet({
@@ -18,12 +17,14 @@ class AsyncPaginatedSheet<T> extends StatefulWidget {
     this.dragStartBehavior = DragStartBehavior.start,
     this.keyboardDismissBehavior = ScrollViewKeyboardDismissBehavior.manual,
     this.clipBehavior = Clip.hardEdge,
-    this.pinnedColumnCount = 0,
+    this.pinnedColumnCount = 1,
     this.pinnedRowCount = 1,
     required this.source,
     required this.columns,
     this.columnSpanBuilder,
     this.rowSpanBuilder,
+    this.defaultRowSpan,
+    this.defaultColumnSpan,
   });
 
   final bool? primary;
@@ -41,6 +42,8 @@ class AsyncPaginatedSheet<T> extends StatefulWidget {
   final List<SheetColumn<T>> columns;
   final SheetSpanBuilder? columnSpanBuilder;
   final SheetSpanBuilder? rowSpanBuilder;
+  final SheetSpan? defaultRowSpan;
+  final SheetSpan? defaultColumnSpan;
 
   @override
   State<AsyncPaginatedSheet<T>> createState() => _AsyncPaginatedSheetState<T>();
@@ -113,17 +116,19 @@ class _AsyncPaginatedSheetState<T> extends State<AsyncPaginatedSheet<T>> {
         const SizedBox.shrink();
   }
 
-  Span _buildRowSpan(int index) {
+  Span? _buildRowSpan(int index) {
     return widget.rowSpanBuilder
             ?.call(index, widget.source.state.value)
-            .toSpan() ??
-        const SheetSpan().toSpan();
+            ?.toSpan() ??
+        widget.defaultRowSpan?.toSpan() ??
+        _defaultSpan;
   }
 
-  Span _buildColumnSpan(int index) {
+  Span? _buildColumnSpan(int index) {
     return widget.columnSpanBuilder
             ?.call(index, widget.source.state.value)
-            .toSpan() ??
-        const SheetSpan().toSpan();
+            ?.toSpan() ??
+        widget.defaultColumnSpan?.toSpan() ??
+        _defaultSpan;
   }
 }

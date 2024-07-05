@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 enum SourceState { idle, loading, success, failure }
 
-typedef SourceFetcher<T> = FutureOr<List<T>> Function(int page);
+typedef SourceFetcher<T> = FutureOr<List<T>> Function(int page, int size);
 
 class AsyncSheetSource<T> {
   final SourceFetcher<T> fetcher;
@@ -43,7 +43,7 @@ class AsyncSheetSource<T> {
     }
 
     try {
-      List<T> newData = await fetcher(index);
+      List<T> newData = await fetcher(index, pageSize);
 
       _pages.putIfAbsent(index, () => newData);
       _state.value = SourceState.success;

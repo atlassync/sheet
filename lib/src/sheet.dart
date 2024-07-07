@@ -54,7 +54,7 @@ class _AsyncPaginatedSheetState<T> extends State<AsyncPaginatedSheet<T>> {
   @override
   void initState() {
     super.initState();
-    _state = SourceState.idle;
+    _state = widget.source.state.value;
     widget.source.state.addListener(_onSourceStateChanged);
   }
 

@@ -5,9 +5,7 @@ class PersonAsyncSheetSource extends AsyncSheetSource<Person> {
   PersonAsyncSheetSource()
       : super(
           fetchData,
-          initialData: initialData,
-          pageSize: 6,
-          cache: true
+          pageSize: 10,
         );
 
   static Future<List<Person>> fetchData(int index, int size) async {

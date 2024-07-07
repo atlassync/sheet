@@ -26,7 +26,7 @@ class AsyncSheetSource<T> {
     if (initialData != null) {
       _initializeWithInitialData(initialData);
     } else {
-      fetchNextPage();
+      _loadPage(1);
     }
   }
 

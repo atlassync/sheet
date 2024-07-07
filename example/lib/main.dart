@@ -58,11 +58,16 @@ class _SheetState extends State<Sheet> {
           },
           child: const Text('Refresh'),
         ),
-        TextButton(
-          onPressed: () async {
-            await _source.fetchPreviousPage();
-          },
-          child: const Text('Previous'),
+        ValueListenableBuilder(
+          valueListenable: _source.pageIndex,
+          builder: (context, page, _) {
+            return TextButton(
+              onPressed: page > 1 ? () async {
+                await _source.fetchPreviousPage();
+              } : null,
+              child: const Text('Previous'),
+            );
+          }
         ),
         const VerticalDivider(width: 2.0),
         ValueListenableBuilder(
@@ -72,11 +77,16 @@ class _SheetState extends State<Sheet> {
           },
         ),
         const VerticalDivider(width: 2.0),
-        TextButton(
-          onPressed: () async {
-            await _source.fetchNextPage();
-          },
-          child: const Text('Next'),
+        ValueListenableBuilder(
+          valueListenable: _source.hasMoreData,
+          builder: (context, hasMoreData, _) {
+            return TextButton(
+              onPressed: hasMoreData ? () async {
+                await _source.fetchNextPage();
+              } : null,
+              child: const Text('Next'),
+            );
+          }
         ),
       ],
     );

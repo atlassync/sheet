@@ -4,9 +4,10 @@ import 'package:sheet/sheet.dart';
 class PersonAsyncSheetSource extends AsyncSheetSource<Person> {
   PersonAsyncSheetSource()
       : super(
-          fetcher: fetchData,
+          fetchData,
           initialData: initialData,
-          pageSize: 30
+          pageSize: 6,
+          cache: true
         );
 
   static Future<List<Person>> fetchData(int index, int size) async {
@@ -14,7 +15,7 @@ class PersonAsyncSheetSource extends AsyncSheetSource<Person> {
     await Future.delayed(const Duration(seconds: 2));
 
     // Generate mock data for the page
-    return List.generate(10, (i) { // You can use pageSize here if you prefer
+    return List.generate(5, (i) { // You can use pageSize here if you prefer
       int personIndex = index * 10 + i; // Use pageSize instead of 10 if preferred
       return Person(
         firstName: 'First$personIndex',
@@ -28,7 +29,7 @@ class PersonAsyncSheetSource extends AsyncSheetSource<Person> {
 // Example usage
 // Initial data to populate the first few pages
 List<Person> initialData = List.generate(
-  25,
+  10,
   (i) => Person(
     firstName: 'InitialFirst$i',
     lastName: 'InitialLast$i',

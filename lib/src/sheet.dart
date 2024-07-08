@@ -112,7 +112,7 @@ class _AsyncPaginatedSheetState<T> extends State<AsyncPaginatedSheet<T>> {
     final itemIndex = vicinity.yIndex - 1;
     final item = widget.source.activePage.value.elementAtOrNull(itemIndex);
     final cell = widget.columns.elementAtOrNull(vicinity.xIndex);
-    return cell?.builder(vicinity, item, widget.source.state.value) ??
+    return cell?.builder(vicinity, item, _state) ??
         const SizedBox.shrink();
   }
 

@@ -46,8 +46,8 @@ class _SheetState extends State<Sheet> {
       body: AsyncPaginatedSheet<Person>(
         source: _source,
         columns: _columns,
-        rowSpanBuilder: _defaultSpanBuilder,
-        columnSpanBuilder: _defaultSpanBuilder,
+        rowSpanBuilder: _defaultRowSpanBuilder,
+        columnSpanBuilder: _defaultColumnSpanBuilder,
         defaultRowSpan: _defaultSpan,
         defaultColumnSpan: _defaultSpan,
       ),
@@ -59,16 +59,17 @@ class _SheetState extends State<Sheet> {
           child: const Text('Refresh'),
         ),
         ValueListenableBuilder(
-          valueListenable: _source.pageIndex,
-          builder: (context, page, _) {
-            return TextButton(
-              onPressed: page > 1 ? () async {
-                await _source.fetchPreviousPage();
-              } : null,
-              child: const Text('Previous'),
-            );
-          }
-        ),
+            valueListenable: _source.pageIndex,
+            builder: (context, page, _) {
+              return TextButton(
+                onPressed: page > 1
+                    ? () async {
+                        await _source.fetchPreviousPage();
+                      }
+                    : null,
+                child: const Text('Previous'),
+              );
+            }),
         const VerticalDivider(width: 2.0),
         ValueListenableBuilder(
           valueListenable: _source.pageIndex,
@@ -78,16 +79,17 @@ class _SheetState extends State<Sheet> {
         ),
         const VerticalDivider(width: 2.0),
         ValueListenableBuilder(
-          valueListenable: _source.hasMoreData,
-          builder: (context, hasMoreData, _) {
-            return TextButton(
-              onPressed: hasMoreData ? () async {
-                await _source.fetchNextPage();
-              } : null,
-              child: const Text('Next'),
-            );
-          }
-        ),
+            valueListenable: _source.hasMoreData,
+            builder: (context, hasMoreData, _) {
+              return TextButton(
+                onPressed: hasMoreData
+                    ? () async {
+                        await _source.fetchNextPage();
+                      }
+                    : null,
+                child: const Text('Next'),
+              );
+            }),
       ],
     );
   }
@@ -95,29 +97,35 @@ class _SheetState extends State<Sheet> {
   List<SheetColumn<Person>> get _columns => [
         SheetColumn<Person>(
           label: const Text('#'),
-          builder: (vicinity, item, state) => Text(vicinity.yIndex.toString()),
+          builder: (vicinity, item, state) => Text(
+            vicinity.yIndex.toString(),
+          ),
         ),
         SheetColumn<Person>(
-          label: const Text('First Name'),
-          builder: (vicinity, item, state) => state != SourceState.loading
+          label: _BuildFirstName(_source),
+          builder: (vicinity, item, state) => state != SourceState.processing
               ? Text(item?.firstName ?? '')
-              : const CircularProgressIndicator(),
+              : const _LoadingIndicator(),
         ),
         SheetColumn<Person>(
-          label: const Text('Last Name'),
-          builder: (vicinity, item, state) => state != SourceState.loading
+          label: _BuildLastName(_source),
+          builder: (vicinity, item, state) => state != SourceState.processing
               ? Text(item?.lastName ?? '')
-              : const CircularProgressIndicator(),
+              : const _LoadingIndicator(),
         ),
         SheetColumn<Person>(
-          label: const Text('Age'),
-          builder: (vicinity, item, state) => state != SourceState.loading
+          label: _BuildAge(_source),
+          builder: (vicinity, item, state) => state != SourceState.processing
               ? Text(item?.age.toString() ?? '')
-              : const CircularProgressIndicator(),
+              : const _LoadingIndicator(),
+        ),
+        SheetColumn<Person>(
+          label: _BuildSearchField(_source),
+          builder: (vicinity, item, state) => const SizedBox.shrink(),
         ),
       ];
 
-  SheetSpan? _defaultSpanBuilder(int index, SourceState _) {
+  SheetSpan? _defaultColumnSpanBuilder(int index, SourceState _) {
     return index == 0
         ? _defaultSpan.copyWith(
             extent: const FixedSpanExtent(
@@ -127,14 +135,104 @@ class _SheetState extends State<Sheet> {
         : null;
   }
 
+  SheetSpan? _defaultRowSpanBuilder(int index, SourceState _) {
+    return _defaultSpan.copyWith(
+      extent: FixedSpanExtent(
+        index == 0 ? 48.0 : 96.0,
+      ),
+    );
+  }
+
   SheetSpan get _defaultSpan => const SheetSpan(
-        extent: FixedSpanExtent(96.0),
+        extent: FixedSpanExtent(240.0),
         foregroundDecoration: SpanDecoration(
           border: SpanBorder(
             trailing: BorderSide(
+              width: 2.0,
               color: Colors.grey,
             ),
           ),
         ),
       );
+}
+
+class _LoadingIndicator extends StatelessWidget {
+  const _LoadingIndicator();
+
+  static const double _factor = 0.5;
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      widthFactor: _factor,
+      heightFactor: _factor,
+      child: CircularProgressIndicator(),
+    );
+  }
+}
+
+class _BuildSearchField extends StatelessWidget {
+  const _BuildSearchField(this._source);
+
+  final AsyncSheetSource<Person> _source;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      decoration: const InputDecoration(
+        hintText: 'Search...',
+      ),
+      onChanged: (value) => _source.filter(
+        (e) => e.firstName.contains(value) || e.lastName.contains(value),
+      ),
+    );
+  }
+}
+
+class _BuildFirstName extends StatelessWidget {
+  const _BuildFirstName(this._source);
+
+  final AsyncSheetSource<Person> _source;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      child: const Text('First Name'),
+      onPressed: () {
+        _source.sort((a, b) => a.firstName.compareTo(b.firstName));
+      },
+    );
+  }
+}
+
+class _BuildLastName extends StatelessWidget {
+  const _BuildLastName(this._source);
+
+  final AsyncSheetSource<Person> _source;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      child: const Text('Last Name'),
+      onPressed: () {
+        _source.sort((a, b) => a.lastName.compareTo(b.lastName));
+      },
+    );
+  }
+}
+
+class _BuildAge extends StatelessWidget {
+  const _BuildAge(this._source);
+
+  final AsyncSheetSource<Person> _source;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      child: const Text('Age'),
+      onPressed: () {
+        _source.sort((a, b) => a.age.compareTo(b.age));
+      },
+    );
+  }
 }

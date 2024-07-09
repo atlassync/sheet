@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-enum SourceState { idle, loading, success, failure }
+enum SourceState { idle, processing, complete }
 
 typedef SourceFetcher<T> = FutureOr<List<T>> Function(int page, int size);
+typedef SourceFilter<T> = bool Function(T);
+typedef SourceComparator<T> = int Function(T a, T b);
+typedef SourceSearch<T> = FutureOr<List<T>> Function();
 
 class AsyncSheetSource<T> {
   final SourceFetcher<T> fetcher;
@@ -42,11 +45,11 @@ class AsyncSheetSource<T> {
   }
 
   FutureOr<void> _loadPage(int index, {bool forceFetch = false}) async {
-    if (_state.value == SourceState.loading) return;
-    _state.value = SourceState.loading;
+    if (_state.value == SourceState.processing) return;
+    _state.value = SourceState.processing;
 
     if (cache && !forceFetch && _pages.containsKey(index)) {
-      _state.value = SourceState.success;
+      _state.value = SourceState.complete;
       _switchPage(index);
       return;
     }
@@ -59,10 +62,10 @@ class AsyncSheetSource<T> {
     try {
       List<T> newData = await fetcher(index, pageSize);
       _pages.update(index, (_) => newData, ifAbsent: () => newData);
-      _state.value = SourceState.success;
+      _state.value = SourceState.complete;
     } catch (e) {
       debugPrint('Error loading page $index: $e');
-      _state.value = SourceState.failure;
+      _state.value = SourceState.complete;
     }
   }
 
@@ -81,6 +84,90 @@ class AsyncSheetSource<T> {
     int previousPageIndex = _activePageIndex - 1;
     if (previousPageIndex < 1) return;
     await _loadPage(previousPageIndex);
+  }
+
+  FutureOr<void> search(SourceSearch<T> delegate) async {
+    _state.value = SourceState.processing;
+    var result = await delegate.call();
+    _activePage.value = result;
+    _state.value = SourceState.complete;
+  }
+
+  void filter(SourceFilter<T> filter) {
+    _state.value = SourceState.processing;
+    List<T> filteredData = [];
+
+    _pages.forEach((page, data) {
+      filteredData.addAll(data.where(filter));
+    });
+
+    _activePage.value = filteredData;
+    _state.value = SourceState.complete;
+  }
+
+  void sort(SourceComparator<T> comparator) {
+    _state.value = SourceState.processing;
+    List<T> sortedData = _activePage.value;
+    sortedData.sort(comparator);
+
+    _activePage.value = sortedData;
+    _state.value = SourceState.complete;
+  }
+
+  void add(T item, {int? pageIndex}) {
+    var index = pageIndex ?? _activePageIndex;
+    _state.value = SourceState.processing;
+
+    bool alreadyExists =
+        _pages.values.any((pageItems) => pageItems.contains(item));
+    if (!alreadyExists) {
+      _pages.putIfAbsent(index, () => []);
+      _pages[index]!.add(item);
+    }
+
+    if (_activePageIndex == index) {
+      _activePage.value = _pages[index]!;
+    }
+    _state.value = SourceState.complete;
+  }
+
+  void addAll(List<T> items, {int? pageIndex}) {
+    var index = pageIndex ?? _activePageIndex;
+    _state.value = SourceState.processing;
+
+    for (var item in items) {
+      bool alreadyExists =
+          _pages.values.any((pageItems) => pageItems.contains(item));
+      if (!alreadyExists) {
+        _pages.putIfAbsent(index, () => []);
+        _pages[index]!.add(item);
+      }
+    }
+
+    if (_activePageIndex == index) {
+      _activePage.value = _pages[index]!;
+    }
+    _state.value = SourceState.complete;
+  }
+
+  void remove(T item, {int? pageIndex}) {
+    var index = pageIndex ?? _activePageIndex;
+    _state.value = SourceState.processing;
+    _pages[index]?.remove(item);
+    if (_activePageIndex == index) {
+      _activePage.value = _pages[index]!;
+    }
+    _state.value = SourceState.complete;
+  }
+
+  void removeAll({int? pageIndex}) {
+    var index = pageIndex ?? _activePageIndex;
+    _state.value = SourceState.processing;
+    _pages.remove(index);
+    if (_activePageIndex == index) {
+      _activePage.value = [];
+    }
+    _state.value = SourceState.complete;
   }
 
   ValueNotifier<int> get pageIndex => _pageIndex;

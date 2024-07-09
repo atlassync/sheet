@@ -73,7 +73,7 @@ class _AsyncPaginatedSheetState<T> extends State<AsyncPaginatedSheet<T>> {
   int? get _columnCount =>
       widget.columns.isEmpty ? null : widget.columns.length;
 
-  int? get _rowCount => _state == SourceState.loading
+  int? get _rowCount => _state == SourceState.processing
       ? null
       : widget.source.activePage.value.length + 1;
 

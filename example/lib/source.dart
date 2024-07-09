@@ -1,3 +1,4 @@
+import 'package:example/mock.dart';
 import 'package:example/person.dart';
 import 'package:sheet/sheet.dart';
 
@@ -6,6 +7,7 @@ class PersonAsyncSheetSource extends AsyncSheetSource<Person> {
       : super(
           fetchData,
           pageSize: 10,
+          initialData: mockData
         );
 
   static Future<List<Person>> fetchData(int index, int size) async {
@@ -23,14 +25,3 @@ class PersonAsyncSheetSource extends AsyncSheetSource<Person> {
     });
   }
 }
-
-// Example usage
-// Initial data to populate the first few pages
-List<Person> initialData = List.generate(
-  10,
-  (i) => Person(
-    firstName: 'InitialFirst$i',
-    lastName: 'InitialLast$i',
-    age: 20 + (i % 10),
-  ),
-);

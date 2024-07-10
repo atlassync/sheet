@@ -5,6 +5,8 @@ import 'package:sheet/sheet.dart';
 abstract class SheetColumn<T> {
   const SheetColumn();
 
-  Widget build(
-      BuildContext context, ChildVicinity vicinity, T? item, SourceState state);
+  Widget label(BuildContext context, ChildVicinity vicinity);
+
+  Widget cell(
+      BuildContext context, ChildVicinity vicinity, T? data, SourceState state);
 }

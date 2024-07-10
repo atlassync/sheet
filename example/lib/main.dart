@@ -13,20 +13,20 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-      home: Sheet(),
+      home: PaginatedSheet(),
     );
   }
 }
 
-class Sheet extends StatefulWidget {
-  const Sheet({super.key});
+class PaginatedSheet extends StatefulWidget {
+  const PaginatedSheet({super.key});
 
   @override
-  State<Sheet> createState() => _SheetState();
+  State<PaginatedSheet> createState() => _PaginatedSheetState();
 }
 
-class _SheetState extends State<Sheet> {
-  late final AsyncSheetSource<Person> _source;
+class _PaginatedSheetState extends State<PaginatedSheet> {
+  late final SheetSource<Person> _source;
 
   @override
   void initState() {
@@ -43,7 +43,7 @@ class _SheetState extends State<Sheet> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AsyncPaginatedSheet<Person>(
+      body: Sheet<Person>(
         source: _source,
         columns: _columns,
         rowSpanBuilder: _defaultRowSpanBuilder,
@@ -94,35 +94,12 @@ class _SheetState extends State<Sheet> {
     );
   }
 
-  List<SheetColumn<Person>> get _columns => [
-        SheetColumn<Person>(
-          label: const Text('#'),
-          builder: (vicinity, item, state) => Text(
-            vicinity.yIndex.toString(),
-          ),
-        ),
-        SheetColumn<Person>(
-          label: _BuildFirstName(_source),
-          builder: (vicinity, item, state) => state != SourceState.processing
-              ? Text(item?.firstName ?? '')
-              : const _LoadingIndicator(),
-        ),
-        SheetColumn<Person>(
-          label: _BuildLastName(_source),
-          builder: (vicinity, item, state) => state != SourceState.processing
-              ? Text(item?.lastName ?? '')
-              : const _LoadingIndicator(),
-        ),
-        SheetColumn<Person>(
-          label: _BuildAge(_source),
-          builder: (vicinity, item, state) => state != SourceState.processing
-              ? Text(item?.age.toString() ?? '')
-              : const _LoadingIndicator(),
-        ),
-        SheetColumn<Person>(
-          label: _BuildSearchField(_source),
-          builder: (vicinity, item, state) => const SizedBox.shrink(),
-        ),
+  List<SheetColumn<Person>> get _columns => const [
+        _IndexColumn(),
+        _FirstNameColumn(),
+        _LastNameColumn(),
+        _AgeColumn(),
+        _SearchColumn()
       ];
 
   SheetSpan? _defaultColumnSpanBuilder(int index, SourceState _) {
@@ -171,68 +148,103 @@ class _LoadingIndicator extends StatelessWidget {
   }
 }
 
-class _BuildSearchField extends StatelessWidget {
-  const _BuildSearchField(this._source);
-
-  final AsyncSheetSource<Person> _source;
+class _IndexColumn extends SheetColumn<Person> {
+  const _IndexColumn();
 
   @override
-  Widget build(BuildContext context) {
-    return TextField(
-      decoration: const InputDecoration(
-        hintText: 'Search...',
-      ),
-      onChanged: (value) => _source.filter(
-        (e) => e.firstName.contains(value) || e.lastName.contains(value),
-      ),
+  Widget build(
+      BuildContext context, ChildVicinity vicinity, item, SourceState state) {
+    if (vicinity.yIndex == 0) return const Text('#');
+
+    return Text(
+      vicinity.yIndex.toString(),
     );
   }
 }
 
-class _BuildFirstName extends StatelessWidget {
-  const _BuildFirstName(this._source);
-
-  final AsyncSheetSource<Person> _source;
+class _SearchColumn extends SheetColumn<Person> {
+  const _SearchColumn();
 
   @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      child: const Text('First Name'),
-      onPressed: () {
-        _source.sort((a, b) => a.firstName.compareTo(b.firstName));
-      },
-    );
+  Widget build(
+      BuildContext context, ChildVicinity vicinity, item, SourceState state) {
+    if (vicinity.yIndex == 0) {
+      return TextField(
+        decoration: const InputDecoration(
+          hintText: 'Search...',
+        ),
+        onChanged: (value) => Sheet.maybeOf<Person>(context)?.filter(
+          (e) => e.firstName.contains(value) || e.lastName.contains(value),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }
 
-class _BuildLastName extends StatelessWidget {
-  const _BuildLastName(this._source);
-
-  final AsyncSheetSource<Person> _source;
+class _FirstNameColumn extends SheetColumn<Person> {
+  const _FirstNameColumn();
 
   @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      child: const Text('Last Name'),
-      onPressed: () {
-        _source.sort((a, b) => a.lastName.compareTo(b.lastName));
-      },
-    );
+  Widget build(
+      BuildContext context, ChildVicinity vicinity, item, SourceState state) {
+    if (vicinity.yIndex == 0) {
+      return TextButton(
+        child: const Text('First Name'),
+        onPressed: () {
+          Sheet.maybeOf<Person>(context)
+              ?.sort((a, b) => a.firstName.compareTo(b.firstName));
+        },
+      );
+    }
+
+    return state == SourceState.processing
+        ? const _LoadingIndicator()
+        : Text(item?.firstName ?? '');
   }
 }
 
-class _BuildAge extends StatelessWidget {
-  const _BuildAge(this._source);
-
-  final AsyncSheetSource<Person> _source;
+class _LastNameColumn extends SheetColumn<Person> {
+  const _LastNameColumn();
 
   @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      child: const Text('Age'),
-      onPressed: () {
-        _source.sort((a, b) => a.age.compareTo(b.age));
-      },
-    );
+  Widget build(
+      BuildContext context, ChildVicinity vicinity, item, SourceState state) {
+    if (vicinity.yIndex == 0) {
+      return TextButton(
+        child: const Text('Last Name'),
+        onPressed: () {
+          Sheet.maybeOf<Person>(context)
+              ?.sort((a, b) => a.lastName.compareTo(b.lastName));
+        },
+      );
+    }
+
+    return state == SourceState.processing
+        ? const _LoadingIndicator()
+        : Text(item?.lastName ?? '');
+  }
+}
+
+class _AgeColumn extends SheetColumn<Person> {
+  const _AgeColumn();
+
+  @override
+  Widget build(
+      BuildContext context, ChildVicinity vicinity, item, SourceState state) {
+    if (vicinity.yIndex == 0) {
+      return TextButton(
+        child: const Text('Age'),
+        onPressed: () {
+          Sheet.maybeOf<Person>(context)
+              ?.sort((a, b) => a.age.compareTo(b.age));
+        },
+      );
+    }
+
+    return state == SourceState.processing
+        ? const _LoadingIndicator()
+        : Text(item?.age.toString() ?? '');
   }
 }

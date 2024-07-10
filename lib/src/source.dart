@@ -8,7 +8,7 @@ typedef SourceFilter<T> = bool Function(T);
 typedef SourceComparator<T> = int Function(T a, T b);
 typedef SourceSearch<T> = FutureOr<List<T>> Function();
 
-class AsyncSheetSource<T> {
+class SheetSource<T> {
   final SourceFetcher<T> fetcher;
   final bool cache;
   final Map<int, List<T>> _pages = {};
@@ -19,7 +19,7 @@ class AsyncSheetSource<T> {
 
   int pageSize = 10; // Default page size
 
-  AsyncSheetSource(
+  SheetSource(
     this.fetcher, {
     List<T>? initialData,
     this.pageSize = 10,

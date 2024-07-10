@@ -185,14 +185,14 @@ class _AsyncPaginatedSheetState<T> extends State<_AsyncPaginatedSheet<T>> {
     if (vicinity.yIndex == 0) {
       return widget.columns
               .elementAtOrNull(vicinity.xIndex)
-              ?.build(context, vicinity, null, _state) ??
+              ?.label(context, vicinity) ??
           const SizedBox.shrink();
     }
 
     final itemIndex = vicinity.yIndex - 1;
     final item = widget.source.activePage.value.elementAtOrNull(itemIndex);
     final column = widget.columns.elementAtOrNull(vicinity.xIndex);
-    return column?.build(context, vicinity, item, _state) ??
+    return column?.cell(context, vicinity, item, _state) ??
         const SizedBox.shrink();
   }
 

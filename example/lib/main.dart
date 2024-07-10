@@ -152,13 +152,16 @@ class _IndexColumn extends SheetColumn<Person> {
   const _IndexColumn();
 
   @override
-  Widget build(
-      BuildContext context, ChildVicinity vicinity, item, SourceState state) {
-    if (vicinity.yIndex == 0) return const Text('#');
-
+  Widget cell(BuildContext context, ChildVicinity vicinity, Person? data,
+      SourceState state) {
     return Text(
       vicinity.yIndex.toString(),
     );
+  }
+
+  @override
+  Widget label(BuildContext context, ChildVicinity vicinity) {
+    return const Text('#');
   }
 }
 
@@ -166,20 +169,21 @@ class _SearchColumn extends SheetColumn<Person> {
   const _SearchColumn();
 
   @override
-  Widget build(
-      BuildContext context, ChildVicinity vicinity, item, SourceState state) {
-    if (vicinity.yIndex == 0) {
-      return TextField(
-        decoration: const InputDecoration(
-          hintText: 'Search...',
-        ),
-        onChanged: (value) => Sheet.maybeOf<Person>(context)?.filter(
-          (e) => e.firstName.contains(value) || e.lastName.contains(value),
-        ),
-      );
-    }
-
+  Widget cell(BuildContext context, ChildVicinity vicinity, Person? data,
+      SourceState state) {
     return const SizedBox.shrink();
+  }
+
+  @override
+  Widget label(BuildContext context, ChildVicinity vicinity) {
+    return TextField(
+      decoration: const InputDecoration(
+        hintText: 'Search...',
+      ),
+      onChanged: (value) => Sheet.maybeOf<Person>(context)?.filter(
+        (e) => e.firstName.contains(value) || e.lastName.contains(value),
+      ),
+    );
   }
 }
 
@@ -187,21 +191,22 @@ class _FirstNameColumn extends SheetColumn<Person> {
   const _FirstNameColumn();
 
   @override
-  Widget build(
-      BuildContext context, ChildVicinity vicinity, item, SourceState state) {
-    if (vicinity.yIndex == 0) {
-      return TextButton(
-        child: const Text('First Name'),
-        onPressed: () {
-          Sheet.maybeOf<Person>(context)
-              ?.sort((a, b) => a.firstName.compareTo(b.firstName));
-        },
-      );
-    }
-
+  Widget cell(BuildContext context, ChildVicinity vicinity, Person? data,
+      SourceState state) {
     return state == SourceState.processing
         ? const _LoadingIndicator()
-        : Text(item?.firstName ?? '');
+        : Text(data?.firstName ?? '');
+  }
+
+  @override
+  Widget label(BuildContext context, ChildVicinity vicinity) {
+    return TextButton(
+      child: const Text('First Name'),
+      onPressed: () {
+        Sheet.maybeOf<Person>(context)
+            ?.sort((a, b) => a.firstName.compareTo(b.firstName));
+      },
+    );
   }
 }
 
@@ -209,21 +214,22 @@ class _LastNameColumn extends SheetColumn<Person> {
   const _LastNameColumn();
 
   @override
-  Widget build(
-      BuildContext context, ChildVicinity vicinity, item, SourceState state) {
-    if (vicinity.yIndex == 0) {
-      return TextButton(
-        child: const Text('Last Name'),
-        onPressed: () {
-          Sheet.maybeOf<Person>(context)
-              ?.sort((a, b) => a.lastName.compareTo(b.lastName));
-        },
-      );
-    }
-
+  Widget cell(BuildContext context, ChildVicinity vicinity, Person? data,
+      SourceState state) {
     return state == SourceState.processing
         ? const _LoadingIndicator()
-        : Text(item?.lastName ?? '');
+        : Text(data?.lastName ?? '');
+  }
+
+  @override
+  Widget label(BuildContext context, ChildVicinity vicinity) {
+    return TextButton(
+      child: const Text('Last Name'),
+      onPressed: () {
+        Sheet.maybeOf<Person>(context)
+            ?.sort((a, b) => a.lastName.compareTo(b.lastName));
+      },
+    );
   }
 }
 
@@ -231,20 +237,20 @@ class _AgeColumn extends SheetColumn<Person> {
   const _AgeColumn();
 
   @override
-  Widget build(
-      BuildContext context, ChildVicinity vicinity, item, SourceState state) {
-    if (vicinity.yIndex == 0) {
-      return TextButton(
-        child: const Text('Age'),
-        onPressed: () {
-          Sheet.maybeOf<Person>(context)
-              ?.sort((a, b) => a.age.compareTo(b.age));
-        },
-      );
-    }
-
+  Widget cell(BuildContext context, ChildVicinity vicinity, Person? data,
+      SourceState state) {
     return state == SourceState.processing
         ? const _LoadingIndicator()
-        : Text(item?.age.toString() ?? '');
+        : Text(data?.age.toString() ?? '');
+  }
+
+  @override
+  Widget label(BuildContext context, ChildVicinity vicinity) {
+    return TextButton(
+      child: const Text('Age'),
+      onPressed: () {
+        Sheet.maybeOf<Person>(context)?.sort((a, b) => a.age.compareTo(b.age));
+      },
+    );
   }
 }

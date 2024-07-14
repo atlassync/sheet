@@ -1,13 +1,13 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:sheet/sheet.dart';
-import 'package:sheet/src/provider.dart';
+import 'package:sheet/src/scope.dart';
 
 typedef SheetSpanBuilder = SheetSpan? Function(int index, SourceState state);
 final _defaultSpan = const SheetSpan().toSpan();
 
-class Sheet<T> extends StatelessWidget {
-  const Sheet({
+class PaginatedSheet<T> extends StatelessWidget {
+  const PaginatedSheet({
     super.key,
     this.primary,
     this.mainAxis = Axis.vertical,
@@ -39,26 +39,26 @@ class Sheet<T> extends StatelessWidget {
   final Clip clipBehavior;
   final int pinnedRowCount;
   final int pinnedColumnCount;
-  final SheetSource<T> source;
+  final PaginatedSheetSource<T> source;
   final List<SheetColumn<T>> columns;
   final SheetSpanBuilder? columnSpanBuilder;
   final SheetSpanBuilder? rowSpanBuilder;
   final SheetSpan? defaultRowSpan;
   final SheetSpan? defaultColumnSpan;
 
-  static SheetSource<T> of<T>(BuildContext context) {
-    return SheetScope.of<T>(context)!;
+  static PaginatedSheetSource<T> of<T>(BuildContext context) {
+    return PaginatedSheetScope.of<T>(context)!;
   }
 
-  static SheetSource<T>? maybeOf<T>(BuildContext context) {
-    return SheetScope.of<T>(context);
+  static PaginatedSheetSource<T>? maybeOf<T>(BuildContext context) {
+    return PaginatedSheetScope.of<T>(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    return SheetScope<T>(
+    return PaginatedSheetScope<T>(
       source: source,
-      child: _AsyncPaginatedSheet<T>(
+      child: _PaginatedSheet<T>(
         key: key,
         primary: primary,
         mainAxis: mainAxis,
@@ -82,8 +82,8 @@ class Sheet<T> extends StatelessWidget {
   }
 }
 
-class _AsyncPaginatedSheet<T> extends StatefulWidget {
-  const _AsyncPaginatedSheet({
+class _PaginatedSheet<T> extends StatefulWidget {
+  const _PaginatedSheet({
     super.key,
     this.primary,
     this.mainAxis = Axis.vertical,
@@ -115,7 +115,7 @@ class _AsyncPaginatedSheet<T> extends StatefulWidget {
   final Clip clipBehavior;
   final int pinnedRowCount;
   final int pinnedColumnCount;
-  final SheetSource<T> source;
+  final PaginatedSheetSource<T> source;
   final List<SheetColumn<T>> columns;
   final SheetSpanBuilder? columnSpanBuilder;
   final SheetSpanBuilder? rowSpanBuilder;
@@ -123,37 +123,50 @@ class _AsyncPaginatedSheet<T> extends StatefulWidget {
   final SheetSpan? defaultColumnSpan;
 
   @override
-  State<_AsyncPaginatedSheet<T>> createState() =>
-      _AsyncPaginatedSheetState<T>();
+  State<_PaginatedSheet<T>> createState() => _PaginatedSheetState<T>();
 }
 
-class _AsyncPaginatedSheetState<T> extends State<_AsyncPaginatedSheet<T>> {
-  late SourceState _state;
+class _PaginatedSheetState<T> extends State<_PaginatedSheet<T>> {
+  late final ValueNotifier<SourceState> _state;
+  late final ScrollController _scrollController;
+
   @override
   void initState() {
     super.initState();
-    _state = widget.source.state.value;
-    widget.source.state.addListener(_onSourceStateChanged);
+    _state = widget.source.state;
+    _state.addListener(_onSourceStateChanged);
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    widget.source.state.removeListener(_onSourceStateChanged);
+    _state.removeListener(_onSourceStateChanged);
+    _state.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
   void _onSourceStateChanged() {
-    setState(() {
-      _state = widget.source.state.value;
-    });
+    setState(() {});
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent) {
+      widget.source.load();
+    }
   }
 
   int? get _columnCount =>
       widget.columns.isEmpty ? null : widget.columns.length;
 
-  int? get _rowCount => _state == SourceState.processing
-      ? null
-      : widget.source.activePage.value.length + 1;
+  int? get _rowCount => _state.value == SourceState.processing
+      ? widget.source.dataLength > 0
+          ? widget.source.dataLength
+          : widget.source.dataLength + 2
+      : widget.source.dataLength + 1;
 
   @override
   Widget build(BuildContext context) {
@@ -161,7 +174,8 @@ class _AsyncPaginatedSheetState<T> extends State<_AsyncPaginatedSheet<T>> {
       primary: widget.primary,
       mainAxis: widget.mainAxis,
       horizontalDetails: widget.horizontalDetails,
-      verticalDetails: widget.verticalDetails,
+      verticalDetails:
+          widget.verticalDetails.copyWith(controller: _scrollController),
       cacheExtent: widget.cacheExtent,
       diagonalDragBehavior: widget.diagonalDragBehavior,
       dragStartBehavior: widget.dragStartBehavior,
@@ -190,24 +204,20 @@ class _AsyncPaginatedSheetState<T> extends State<_AsyncPaginatedSheet<T>> {
     }
 
     final itemIndex = vicinity.yIndex - 1;
-    final item = widget.source.activePage.value.elementAtOrNull(itemIndex);
+    final item = widget.source.elementAt(itemIndex);
     final column = widget.columns.elementAtOrNull(vicinity.xIndex);
-    return column?.cell(context, vicinity, item, _state) ??
+    return column?.cell(context, vicinity, item, _state.value) ??
         const SizedBox.shrink();
   }
 
   Span? _buildRowSpan(int index) {
-    return widget.rowSpanBuilder
-            ?.call(index, widget.source.state.value)
-            ?.toSpan() ??
+    return widget.rowSpanBuilder?.call(index, _state.value)?.toSpan() ??
         widget.defaultRowSpan?.toSpan() ??
         _defaultSpan;
   }
 
   Span? _buildColumnSpan(int index) {
-    return widget.columnSpanBuilder
-            ?.call(index, widget.source.state.value)
-            ?.toSpan() ??
+    return widget.columnSpanBuilder?.call(index, _state.value)?.toSpan() ??
         widget.defaultColumnSpan?.toSpan() ??
         _defaultSpan;
   }

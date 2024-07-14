@@ -1,198 +1,180 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 
-enum SourceState { idle, processing, complete }
+import 'package:flutter/material.dart';
 
-typedef SourceFetcher<T> = FutureOr<List<T>> Function(int page, int size);
-typedef SourceFilter<T> = bool Function(T);
-typedef SourceComparator<T> = int Function(T a, T b);
-typedef SourceSearch<T> = FutureOr<List<T>> Function();
+enum SourceState { idle, processing, complete, intercepted }
 
-class SheetSource<T> {
-  final SourceFetcher<T> fetcher;
-  final bool cache;
-  final Map<int, List<T>> _pages = {};
-  final ValueNotifier<List<T>> _activePage = ValueNotifier([]);
+abstract interface class PaginatedSheetSource<T> {
+  void init();
+  FutureOr<void> load();
+  FutureOr<void> refresh();
+  void filter(bool Function(T) test);
+  void sort([int Function(T a, T b)? compare]);
+  T? elementAt(int index);
+  void insert(T item, [int? index]);
+  void insertAll(Iterable<T> items, [int? index]);
+  void remove(T item);
+  void removeAt(int index);
+  void removeAll();
+  void clear();
+  void reset();
+  void dispose();
+  int get page;
+  int get pageSize;
+  Iterable<T> get data;
+  bool get hasMoreData;
+  int get dataLength;
+  ValueNotifier<SourceState> get state;
+}
+
+mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
+  int _page = 0;
+  int _pageSize = 20;
+  final List<T> _originalData = [];
+  List<T> _filteredData = [];
+  bool _hasMoreData = true;
   final ValueNotifier<SourceState> _state = ValueNotifier(SourceState.idle);
-  final ValueNotifier<int> _pageIndex = ValueNotifier(1);
-  final ValueNotifier<bool> _hasMoreData = ValueNotifier(true);
 
-  int pageSize = 10; // Default page size
-
-  SheetSource(
-    this.fetcher, {
-    List<T>? initialData,
-    this.pageSize = 10,
-    this.cache = true,
-  }) {
-    _activePage.addListener(_updateHasMoreDataFlag);
-    if (initialData != null) {
-      _initializeWithInitialData(initialData);
-    } else {
-      _loadPage(1);
-    }
-  }
-
-  void _initializeWithInitialData(List<T> initialData) {
-    for (var i = 0; i < initialData.length; i += pageSize) {
-      var end = (i + pageSize > initialData.length)
-          ? initialData.length
-          : i + pageSize;
-      _pages.putIfAbsent(
-          (i ~/ pageSize) + 1, () => initialData.sublist(i, end));
-    }
-    _activePage.value = _pages.isNotEmpty ? _pages[1]! : [];
-  }
-
-  FutureOr<void> _loadPage(int index, {bool forceFetch = false}) async {
-    if (_state.value == SourceState.processing) return;
+  @override
+  FutureOr<void> load() async {
+    if (_state.value == SourceState.processing || !_hasMoreData) return;
     _state.value = SourceState.processing;
 
-    if (cache && !forceFetch && _pages.containsKey(index)) {
-      _state.value = SourceState.complete;
-      _switchPage(index);
-      return;
-    }
-
-    await _fetchAndUpdatePage(index);
-    _switchPage(index);
-  }
-
-  Future<void> _fetchAndUpdatePage(int index) async {
+    var newPage = _page + 1;
     try {
-      List<T> newData = await fetcher(index, pageSize);
-      _pages.update(index, (_) => newData, ifAbsent: () => newData);
+      final nextPageData = await getNextPage(newPage, _pageSize);
+      if (nextPageData.isEmpty || nextPageData.length < _pageSize) {
+        _hasMoreData = false;
+      } else {
+        _originalData.addAll(nextPageData);
+        _filteredData = List.from(_originalData);
+        _page++;
+        _hasMoreData = nextPageData.length >= _pageSize;
+      }
       _state.value = SourceState.complete;
     } catch (e) {
-      debugPrint('Error loading page $index: $e');
-      _state.value = SourceState.complete;
+      _state.value = SourceState.intercepted;
+      rethrow;
     }
   }
 
-  FutureOr<void> fetchNextPage() async {
-    int nextPageIndex = _activePageIndex + 1;
-    await _loadPage(nextPageIndex);
+  FutureOr<Iterable<T>> getNextPage(int page, int size);
+
+  @override
+  FutureOr<void> refresh() async {
+    reset();
+    await load();
   }
 
-  FutureOr<void> refreshPage({int? index}) async {
-    if (index != null && (index < 1 || index > _activePageIndex)) return;
-    int pageIndexToRefresh = index ?? _activePageIndex;
-    await _loadPage(pageIndexToRefresh, forceFetch: true);
+  set pageSize(int size) {
+    if (size <= 0) return;
+    _pageSize = size;
   }
 
-  FutureOr<void> fetchPreviousPage() async {
-    int previousPageIndex = _activePageIndex - 1;
-    if (previousPageIndex < 1) return;
-    await _loadPage(previousPageIndex);
-  }
-
-  FutureOr<void> search(SourceSearch<T> delegate) async {
+  @override
+  void filter(bool Function(T) test) {
     _state.value = SourceState.processing;
-    var result = await delegate.call();
-    _activePage.value = result;
+    _filteredData = _originalData.where(test).toList();
     _state.value = SourceState.complete;
   }
 
-  void filter(SourceFilter<T> filter) {
+  @override
+  void sort([int Function(T a, T b)? compare]) {
     _state.value = SourceState.processing;
-    List<T> filteredData = [];
-
-    _pages.forEach((page, data) {
-      filteredData.addAll(data.where(filter));
-    });
-
-    _activePage.value = filteredData;
+    _filteredData.sort(compare);
     _state.value = SourceState.complete;
   }
 
-  void sort(SourceComparator<T> comparator) {
-    _state.value = SourceState.processing;
-    List<T> sortedData = _activePage.value;
-    sortedData.sort(comparator);
-
-    _activePage.value = sortedData;
-    _state.value = SourceState.complete;
+  @override
+  T? elementAt(int index) {
+    return _filteredData.elementAtOrNull(index);
   }
 
-  void add(T item, {int? pageIndex}) {
-    var index = pageIndex ?? _activePageIndex;
+  @override
+  void insert(T item, [int? index]) {
     _state.value = SourceState.processing;
-
-    bool alreadyExists =
-        _pages.values.any((pageItems) => pageItems.contains(item));
-    if (!alreadyExists) {
-      _pages.putIfAbsent(index, () => []);
-      _pages[index]!.add(item);
+    if (index != null && index >= 0 && index < _originalData.length) {
+      _originalData.insert(index, item);
+    } else {
+      _originalData.add(item);
     }
-
-    if (_activePageIndex == index) {
-      _activePage.value = _pages[index]!;
-    }
+    _filteredData = List.from(_originalData);
     _state.value = SourceState.complete;
   }
 
-  void addAll(List<T> items, {int? pageIndex}) {
-    var index = pageIndex ?? _activePageIndex;
+  @override
+  void insertAll(Iterable<T> items, [int? index]) {
     _state.value = SourceState.processing;
-
-    for (var item in items) {
-      bool alreadyExists =
-          _pages.values.any((pageItems) => pageItems.contains(item));
-      if (!alreadyExists) {
-        _pages.putIfAbsent(index, () => []);
-        _pages[index]!.add(item);
-      }
+    if (index != null && index >= 0 && index < _originalData.length) {
+      _originalData.insertAll(index, items);
+    } else {
+      _originalData.addAll(items);
     }
-
-    if (_activePageIndex == index) {
-      _activePage.value = _pages[index]!;
-    }
+    _filteredData = List.from(_originalData);
     _state.value = SourceState.complete;
   }
 
-  void remove(T item, {int? pageIndex}) {
-    var index = pageIndex ?? _activePageIndex;
+  @override
+  void remove(T item) {
     _state.value = SourceState.processing;
-    _pages[index]?.remove(item);
-    if (_activePageIndex == index) {
-      _activePage.value = _pages[index]!;
-    }
+    _originalData.remove(item);
+    _filteredData.remove(item);
     _state.value = SourceState.complete;
   }
 
-  void removeAll({int? pageIndex}) {
-    var index = pageIndex ?? _activePageIndex;
+  @override
+  void removeAt(int index) {
     _state.value = SourceState.processing;
-    _pages.remove(index);
-    if (_activePageIndex == index) {
-      _activePage.value = [];
-    }
+    T item = _originalData.removeAt(index);
+    _filteredData.remove(item);
     _state.value = SourceState.complete;
   }
 
-  ValueNotifier<int> get pageIndex => _pageIndex;
-  ValueNotifier<List<T>> get activePage => _activePage;
-  ValueNotifier<SourceState> get state => _state;
-  ValueNotifier<bool> get hasMoreData => _hasMoreData;
-
-  void _switchPage(int index) {
-    _pageIndex.value = index;
-    _activePage.value = _pages[index]!;
+  @override
+  void removeAll() {
+    _state.value = SourceState.processing;
+    _originalData.clear();
+    _filteredData.clear();
+    _state.value = SourceState.complete;
   }
 
-  void _updateHasMoreDataFlag() {
-    int highestCachedPage = _pages.keys.reduce((a, b) => a > b ? a : b);
-
-    _hasMoreData.value = _activePage.value.length >= pageSize ||
-        _activePageIndex < highestCachedPage;
+  @override
+  void clear() {
+    _state.value = SourceState.processing;
+    _filteredData = List.from(_originalData);
+    _state.value = SourceState.complete;
   }
 
-  int get _activePageIndex => _pageIndex.value;
+  @override
+  void reset() {
+    _originalData.clear();
+    _filteredData.clear();
+    _page = 0;
+    _hasMoreData = true;
+    _state.value = SourceState.idle;
+  }
 
+  @override
   void dispose() {
-    _activePage.removeListener(_updateHasMoreDataFlag);
+    reset();
     _state.dispose();
-    _activePage.dispose();
-    _pageIndex.dispose();
   }
+
+  @override
+  int get page => _page;
+
+  @override
+  int get pageSize => _pageSize;
+
+  @override
+  Iterable<T> get data => _filteredData;
+
+  @override
+  bool get hasMoreData => _hasMoreData;
+
+  @override
+  int get dataLength => _filteredData.length;
+
+  @override
+  ValueNotifier<SourceState> get state => _state;
 }

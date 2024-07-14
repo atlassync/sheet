@@ -36,6 +36,9 @@ mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
   final ValueNotifier<SourceState> _state = ValueNotifier(SourceState.idle);
 
   @override
+  void init() {}
+
+  @override
   FutureOr<void> load() async {
     if (_state.value == SourceState.processing || !_hasMoreData) return;
     _state.value = SourceState.processing;
@@ -43,14 +46,10 @@ mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
     var newPage = _page + 1;
     try {
       final nextPageData = await getNextPage(newPage, _pageSize);
-      if (nextPageData.isEmpty || nextPageData.length < _pageSize) {
-        _hasMoreData = false;
-      } else {
-        _originalData.addAll(nextPageData);
-        _filteredData = List.from(_originalData);
-        _page++;
-        _hasMoreData = nextPageData.length >= _pageSize;
-      }
+      _originalData.addAll(nextPageData);
+      _filteredData = List.from(_originalData);
+      _page = newPage;
+      _hasMoreData = nextPageData.length >= _pageSize;
       _state.value = SourceState.complete;
     } catch (e) {
       _state.value = SourceState.intercepted;

@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   sheet:
     path: ../
+  skeletonizer: ^1.4.1+1
 
 dev_dependencies:
   flutter_test:

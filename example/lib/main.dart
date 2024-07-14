@@ -2,6 +2,13 @@ import 'package:example/person.dart';
 import 'package:example/source.dart';
 import 'package:flutter/material.dart';
 import 'package:sheet/sheet.dart';
+import 'package:skeletonizer/skeletonizer.dart';
+
+part 'components/age_column.dart';
+part 'components/first_name_column.dart';
+part 'components/index.column.dart';
+part 'components/last_name.column.dart';
+part 'components/search_column.dart';
 
 void main() {
   runApp(const MainApp());
@@ -12,26 +19,28 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: PaginatedSheet(),
+    return MaterialApp(
+      theme: ThemeData.dark(useMaterial3: true),
+      themeMode: ThemeMode.dark,
+      home: const Sheet(),
     );
   }
 }
 
-class PaginatedSheet extends StatefulWidget {
-  const PaginatedSheet({super.key});
+class Sheet extends StatefulWidget {
+  const Sheet({super.key});
 
   @override
-  State<PaginatedSheet> createState() => _PaginatedSheetState();
+  State<Sheet> createState() => _SheetState();
 }
 
-class _PaginatedSheetState extends State<PaginatedSheet> {
-  late final SheetSource<Person> _source;
+class _SheetState extends State<Sheet> {
+  late final PaginatedSheetSource<Person> _source;
 
   @override
   void initState() {
     super.initState();
-    _source = PersonAsyncSheetSource();
+    _source = PersonAsyncSheetSource()..init();
   }
 
   @override
@@ -43,7 +52,7 @@ class _PaginatedSheetState extends State<PaginatedSheet> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Sheet<Person>(
+      body: PaginatedSheet<Person>(
         source: _source,
         columns: _columns,
         rowSpanBuilder: _defaultRowSpanBuilder,
@@ -51,46 +60,6 @@ class _PaginatedSheetState extends State<PaginatedSheet> {
         defaultRowSpan: _defaultSpan,
         defaultColumnSpan: _defaultSpan,
       ),
-      persistentFooterButtons: [
-        TextButton(
-          onPressed: () async {
-            await _source.refreshPage();
-          },
-          child: const Text('Refresh'),
-        ),
-        ValueListenableBuilder(
-            valueListenable: _source.pageIndex,
-            builder: (context, page, _) {
-              return TextButton(
-                onPressed: page > 1
-                    ? () async {
-                        await _source.fetchPreviousPage();
-                      }
-                    : null,
-                child: const Text('Previous'),
-              );
-            }),
-        const VerticalDivider(width: 2.0),
-        ValueListenableBuilder(
-          valueListenable: _source.pageIndex,
-          builder: (context, index, _) {
-            return Text('Page $index');
-          },
-        ),
-        const VerticalDivider(width: 2.0),
-        ValueListenableBuilder(
-            valueListenable: _source.hasMoreData,
-            builder: (context, hasMoreData, _) {
-              return TextButton(
-                onPressed: hasMoreData
-                    ? () async {
-                        await _source.fetchNextPage();
-                      }
-                    : null,
-                child: const Text('Next'),
-              );
-            }),
-      ],
     );
   }
 
@@ -131,126 +100,4 @@ class _PaginatedSheetState extends State<PaginatedSheet> {
           ),
         ),
       );
-}
-
-class _LoadingIndicator extends StatelessWidget {
-  const _LoadingIndicator();
-
-  static const double _factor = 0.5;
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      widthFactor: _factor,
-      heightFactor: _factor,
-      child: CircularProgressIndicator(),
-    );
-  }
-}
-
-class _IndexColumn extends SheetColumn<Person> {
-  const _IndexColumn();
-
-  @override
-  Widget cell(BuildContext context, ChildVicinity vicinity, Person? data,
-      SourceState state) {
-    return Text(
-      vicinity.yIndex.toString(),
-    );
-  }
-
-  @override
-  Widget label(BuildContext context, ChildVicinity vicinity) {
-    return const Text('#');
-  }
-}
-
-class _SearchColumn extends SheetColumn<Person> {
-  const _SearchColumn();
-
-  @override
-  Widget cell(BuildContext context, ChildVicinity vicinity, Person? data,
-      SourceState state) {
-    return const SizedBox.shrink();
-  }
-
-  @override
-  Widget label(BuildContext context, ChildVicinity vicinity) {
-    return TextField(
-      decoration: const InputDecoration(
-        hintText: 'Search...',
-      ),
-      onChanged: (value) => Sheet.maybeOf<Person>(context)?.filter(
-        (e) => e.firstName.contains(value) || e.lastName.contains(value),
-      ),
-    );
-  }
-}
-
-class _FirstNameColumn extends SheetColumn<Person> {
-  const _FirstNameColumn();
-
-  @override
-  Widget cell(BuildContext context, ChildVicinity vicinity, Person? data,
-      SourceState state) {
-    return state == SourceState.processing
-        ? const _LoadingIndicator()
-        : Text(data?.firstName ?? '');
-  }
-
-  @override
-  Widget label(BuildContext context, ChildVicinity vicinity) {
-    return TextButton(
-      child: const Text('First Name'),
-      onPressed: () {
-        Sheet.maybeOf<Person>(context)
-            ?.sort((a, b) => a.firstName.compareTo(b.firstName));
-      },
-    );
-  }
-}
-
-class _LastNameColumn extends SheetColumn<Person> {
-  const _LastNameColumn();
-
-  @override
-  Widget cell(BuildContext context, ChildVicinity vicinity, Person? data,
-      SourceState state) {
-    return state == SourceState.processing
-        ? const _LoadingIndicator()
-        : Text(data?.lastName ?? '');
-  }
-
-  @override
-  Widget label(BuildContext context, ChildVicinity vicinity) {
-    return TextButton(
-      child: const Text('Last Name'),
-      onPressed: () {
-        Sheet.maybeOf<Person>(context)
-            ?.sort((a, b) => a.lastName.compareTo(b.lastName));
-      },
-    );
-  }
-}
-
-class _AgeColumn extends SheetColumn<Person> {
-  const _AgeColumn();
-
-  @override
-  Widget cell(BuildContext context, ChildVicinity vicinity, Person? data,
-      SourceState state) {
-    return state == SourceState.processing
-        ? const _LoadingIndicator()
-        : Text(data?.age.toString() ?? '');
-  }
-
-  @override
-  Widget label(BuildContext context, ChildVicinity vicinity) {
-    return TextButton(
-      child: const Text('Age'),
-      onPressed: () {
-        Sheet.maybeOf<Person>(context)?.sort((a, b) => a.age.compareTo(b.age));
-      },
-    );
-  }
 }

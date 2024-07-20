@@ -6,7 +6,7 @@ import 'package:sheet/sheet.dart';
 
 class PersonAsyncSheetSource with PaginatedSheetSourceMixin<Person> {
   @override
-  void init() {
+  FutureOr<void> init() {
     pageSize = 10;
     insertAll(mockData);
   }

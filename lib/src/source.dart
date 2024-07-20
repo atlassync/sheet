@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 enum SourceState { idle, processing, complete, intercepted }
 
 abstract interface class PaginatedSheetSource<T> {
-  void init();
+  FutureOr<void> init();
   FutureOr<void> load();
   FutureOr<void> refresh();
   void filter(bool Function(T) test);
@@ -36,7 +36,7 @@ mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
   final ValueNotifier<SourceState> _state = ValueNotifier(SourceState.idle);
 
   @override
-  void init() {}
+  FutureOr<void> init() {}
 
   @override
   FutureOr<void> load() async {

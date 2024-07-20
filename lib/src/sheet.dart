@@ -127,22 +127,19 @@ class _PaginatedSheet<T> extends StatefulWidget {
 }
 
 class _PaginatedSheetState<T> extends State<_PaginatedSheet<T>> {
-  late final ValueNotifier<SourceState> _state;
   late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
-    _state = widget.source.state;
-    _state.addListener(_onSourceStateChanged);
+    widget.source.state.addListener(_onSourceStateChanged);
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _state.removeListener(_onSourceStateChanged);
-    _state.dispose();
+    widget.source.state.removeListener(_onSourceStateChanged);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -162,7 +159,7 @@ class _PaginatedSheetState<T> extends State<_PaginatedSheet<T>> {
   int? get _columnCount =>
       widget.columns.isEmpty ? null : widget.columns.length;
 
-  int? get _rowCount => _state.value == SourceState.processing
+  int? get _rowCount => widget.source.state.value == SourceState.processing
       ? widget.source.dataLength > 0
           ? widget.source.dataLength
           : widget.source.dataLength + 2
@@ -206,18 +203,18 @@ class _PaginatedSheetState<T> extends State<_PaginatedSheet<T>> {
     final itemIndex = vicinity.yIndex - 1;
     final item = widget.source.elementAt(itemIndex);
     final column = widget.columns.elementAtOrNull(vicinity.xIndex);
-    return column?.cell(context, vicinity, item, _state.value) ??
+    return column?.cell(context, vicinity, item, widget.source.state.value) ??
         const SizedBox.shrink();
   }
 
   Span? _buildRowSpan(int index) {
-    return widget.rowSpanBuilder?.call(index, _state.value)?.toSpan() ??
+    return widget.rowSpanBuilder?.call(index, widget.source.state.value)?.toSpan() ??
         widget.defaultRowSpan?.toSpan() ??
         _defaultSpan;
   }
 
   Span? _buildColumnSpan(int index) {
-    return widget.columnSpanBuilder?.call(index, _state.value)?.toSpan() ??
+    return widget.columnSpanBuilder?.call(index, widget.source.state.value)?.toSpan() ??
         widget.defaultColumnSpan?.toSpan() ??
         _defaultSpan;
   }

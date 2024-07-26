@@ -52,6 +52,7 @@ class _SheetState extends State<Sheet> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(),
       body: PaginatedSheet<Person>(
         source: _source,
         columns: _columns,

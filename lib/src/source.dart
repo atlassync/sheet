@@ -11,6 +11,8 @@ abstract interface class PaginatedSheetSource<T> {
   void filter(bool Function(T) test);
   void sort([int Function(T a, T b)? compare]);
   T? elementAt(int index);
+  void put(T item, bool Function(T) test);
+  void putAll(Iterable<T> items, bool Function(T, T) test);
   void insert(T item, [int? index]);
   void insertAll(Iterable<T> items, [int? index]);
   void remove(T item);
@@ -87,6 +89,34 @@ mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
   @override
   T? elementAt(int index) {
     return _filteredData.elementAtOrNull(index);
+  }
+
+  @override
+  void put(T item, bool Function(T) test) {
+    _state.value = SourceState.processing;
+    var index = _originalData.indexWhere(test);
+    if (index < 0) {
+      _originalData.add(item);
+    } else {
+      _originalData[index] = item;
+    }
+    _filteredData = List.from(_originalData);
+    _state.value = SourceState.complete;
+  }
+
+  @override
+  void putAll(Iterable<T> items, bool Function(T, T) test) {
+    _state.value = SourceState.processing;
+    for (T newItem in items) {
+      var index = _originalData.indexWhere((existingItem) => test(existingItem, newItem));
+      if (index < 0) {
+        _originalData.add(newItem);
+      } else {
+        _originalData[index] = newItem;
+      }
+    }
+    _filteredData = List.from(_originalData);
+    _state.value = SourceState.complete;
   }
 
   @override

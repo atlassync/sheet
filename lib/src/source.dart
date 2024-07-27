@@ -11,6 +11,7 @@ abstract interface class PaginatedSheetSource<T> {
   void filter(bool Function(T) test);
   void sort([int Function(T a, T b)? compare]);
   T? elementAt(int index);
+  void replaceWhere(bool Function(T) test, T Function(T) copyFunction);
   void put(T item, bool Function(T) test);
   void putAll(Iterable<T> items, bool Function(T, T) test);
   void insert(T item, [int? index]);
@@ -21,6 +22,7 @@ abstract interface class PaginatedSheetSource<T> {
   void clear();
   void reset();
   void dispose();
+  void notify(SourceState state);
   int get page;
   int get pageSize;
   Iterable<T> get data;
@@ -43,7 +45,7 @@ mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
   @override
   FutureOr<void> load() async {
     if (_state.value == SourceState.processing || !_hasMoreData) return;
-    _state.value = SourceState.processing;
+    notify(SourceState.processing);
 
     var newPage = _page + 1;
     try {
@@ -52,9 +54,9 @@ mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
       _filteredData = List.from(_originalData);
       _page = newPage;
       _hasMoreData = nextPageData.length >= _pageSize;
-      _state.value = SourceState.complete;
+      notify(SourceState.complete);
     } catch (e) {
-      _state.value = SourceState.intercepted;
+      notify(SourceState.intercepted);
       rethrow;
     }
   }
@@ -74,16 +76,16 @@ mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
 
   @override
   void filter(bool Function(T) test) {
-    _state.value = SourceState.processing;
+    notify(SourceState.processing);
     _filteredData = _originalData.where(test).toList();
-    _state.value = SourceState.complete;
+    notify(SourceState.complete);
   }
 
   @override
   void sort([int Function(T a, T b)? compare]) {
-    _state.value = SourceState.processing;
+    notify(SourceState.processing);
     _filteredData.sort(compare);
-    _state.value = SourceState.complete;
+    notify(SourceState.complete);
   }
 
   @override
@@ -92,8 +94,22 @@ mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
   }
 
   @override
+  void replaceWhere(bool Function(T) test, T Function(T) copyFunction) {
+    notify(SourceState.processing);
+    for (int i = 0; i < _originalData.length; i++) {
+      T? item = elementAt(i);
+      if (item == null || !test(item)) continue;
+      T newItem = copyFunction(item);
+      _originalData[i] = newItem;
+      break;
+    }
+    _filteredData = List.from(_originalData);
+    notify(SourceState.complete);
+  }
+
+  @override
   void put(T item, bool Function(T) test) {
-    _state.value = SourceState.processing;
+    notify(SourceState.processing);
     var index = _originalData.indexWhere(test);
     if (index < 0) {
       _originalData.add(item);
@@ -101,14 +117,15 @@ mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
       _originalData[index] = item;
     }
     _filteredData = List.from(_originalData);
-    _state.value = SourceState.complete;
+    notify(SourceState.complete);
   }
 
   @override
   void putAll(Iterable<T> items, bool Function(T, T) test) {
-    _state.value = SourceState.processing;
+    notify(SourceState.processing);
     for (T newItem in items) {
-      var index = _originalData.indexWhere((existingItem) => test(existingItem, newItem));
+      var index = _originalData
+          .indexWhere((existingItem) => test(existingItem, newItem));
       if (index < 0) {
         _originalData.add(newItem);
       } else {
@@ -116,62 +133,62 @@ mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
       }
     }
     _filteredData = List.from(_originalData);
-    _state.value = SourceState.complete;
+    notify(SourceState.complete);
   }
 
   @override
   void insert(T item, [int? index]) {
-    _state.value = SourceState.processing;
+    notify(SourceState.processing);
     if (index != null && index >= 0 && index < _originalData.length) {
       _originalData.insert(index, item);
     } else {
       _originalData.add(item);
     }
     _filteredData = List.from(_originalData);
-    _state.value = SourceState.complete;
+    notify(SourceState.complete);
   }
 
   @override
   void insertAll(Iterable<T> items, [int? index]) {
-    _state.value = SourceState.processing;
+    notify(SourceState.processing);
     if (index != null && index >= 0 && index < _originalData.length) {
       _originalData.insertAll(index, items);
     } else {
       _originalData.addAll(items);
     }
     _filteredData = List.from(_originalData);
-    _state.value = SourceState.complete;
+    notify(SourceState.complete);
   }
 
   @override
   void remove(T item) {
-    _state.value = SourceState.processing;
+    notify(SourceState.processing);
     _originalData.remove(item);
     _filteredData.remove(item);
-    _state.value = SourceState.complete;
+    notify(SourceState.complete);
   }
 
   @override
   void removeAt(int index) {
-    _state.value = SourceState.processing;
+    notify(SourceState.processing);
     T item = _originalData.removeAt(index);
     _filteredData.remove(item);
-    _state.value = SourceState.complete;
+    notify(SourceState.complete);
   }
 
   @override
   void removeAll() {
-    _state.value = SourceState.processing;
+    notify(SourceState.processing);
     _originalData.clear();
     _filteredData.clear();
-    _state.value = SourceState.complete;
+    notify(SourceState.complete);
   }
 
   @override
   void clear() {
-    _state.value = SourceState.processing;
+    notify(SourceState.processing);
     _filteredData = List.from(_originalData);
-    _state.value = SourceState.complete;
+    notify(SourceState.complete);
   }
 
   @override
@@ -180,13 +197,18 @@ mixin PaginatedSheetSourceMixin<T> implements PaginatedSheetSource<T> {
     _filteredData.clear();
     _page = 0;
     _hasMoreData = true;
-    _state.value = SourceState.idle;
+    notify(SourceState.idle);
   }
 
   @override
   void dispose() {
     reset();
     _state.dispose();
+  }
+
+  @override
+  void notify(SourceState state) {
+    _state.value = state;
   }
 
   @override
